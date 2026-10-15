@@ -2,10 +2,11 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <WiFiManager.h>
 #include "arduino_secrets.h"
 
-const char* ssid = SECRET_SSID;
-const char* password = SECRET_PSW;
+//const char* ssid = SECRET_SSID;
+//const char* password = SECRET_PSW;
 const char* apiKey = SECRET_API;
 
 M5Canvas canvas(&M5Cardputer.Display);
@@ -18,21 +19,51 @@ void setup() {
     
     canvas.createSprite(240, 135);
     canvas.setTextSize(1);
-    canvas.setTextScroll(true); // Scorrimento attivo
+    canvas.setTextScroll(true);
     
-    canvas.println("Connessione WiFi...");
+    // Istruzioni a schermo per il Captive Portal
+    canvas.fillSprite(TFT_BLACK);
+    canvas.setTextColor(TFT_YELLOW);
+    canvas.setCursor(10, 10);
+    canvas.println("=== AI CHAT SETUP ===");
+    canvas.setTextColor(TFT_WHITE);
+    canvas.println("\nTentativo di connessione...");
+    canvas.println("Se fallisce, usa il telefono:");
+    canvas.setTextColor(TFT_CYAN);
+    canvas.println("1. Connettiti alla rete:");
+    canvas.println("   'Cardputer_AI'");
+    canvas.println("2. Inserisci SSID e Password");
     canvas.pushSprite(0, 0);
     
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) { 
-        delay(500); 
-        canvas.print(".");
+    WiFiManager wm;
+    
+    // wm.resetSettings(); // Scommenta e carica il codice una volta se vuoi resettare le reti salvate
+    
+    // autoConnect prova a connettersi. Se fallisce, crea la rete "Cardputer_AI" e blocca il codice qui 
+    // finché non inserisci i dati dal telefono.
+    bool res = wm.autoConnect("Cardputer_AI");
+    
+    if (!res) {
+        canvas.fillSprite(TFT_BLACK);
+        canvas.setCursor(0, 0);
+        canvas.setTextColor(TFT_RED);
+        canvas.println("\nTimeout o errore WiFi.");
+        canvas.println("Riavvio in corso...");
         canvas.pushSprite(0, 0);
+        delay(3000);
+        esp_restart();
     }
     
-    canvas.println("\nConnesso!");
+    // Connessione avvenuta con successo (da reti salvate o appena inserite)
+    canvas.fillSprite(TFT_BLACK); 
+    canvas.setCursor(0, 0);
+    canvas.setTextColor(TFT_GREEN);
+    canvas.println("WiFi Connesso!");
+    canvas.setTextColor(TFT_WHITE);
+    canvas.print("IP: ");
+    canvas.println(WiFi.localIP());
     canvas.setTextColor(TFT_CYAN);
-    canvas.print("Tu: ");
+    canvas.print("\nTu: ");
     canvas.pushSprite(0, 0);
 }
 
@@ -102,38 +133,44 @@ void loop() {
     }
 
     if (M5Cardputer.Keyboard.isChange()) {
-        if (M5Cardputer.Keyboard.isPressed()) {
-            auto status = M5Cardputer.Keyboard.keysState();
-            
-            if (M5Cardputer.Keyboard.isKeyPressed(KEY_ENTER)) {
-                if (inputText.length() > 0) {
-                    askAI(inputText);
-                    inputText = ""; 
-                }
-            } 
-            else if (M5Cardputer.Keyboard.isKeyPressed(8)) { // Backspace
-                if (inputText.length() > 0) {
-                    inputText.remove(inputText.length() - 1);
-                    writeToCanvas("<", TFT_RED, false); 
-                }
-            } 
-            else {
-                
-                for (auto i : status.word) {
-                    inputText += i;
-                    canvas.setTextColor(TFT_CYAN);
-                    canvas.print(i); 
-                }
-                
-                if(status.del) {
-                    inputText.remove(inputText.length() - 1);
-                    canvas.setCursor(canvas.getCursorX()-6, canvas.getCursorY());
-                    canvas.print("  ");
-                    canvas.setCursor(canvas.getCursorX()-6, canvas.getCursorY());
-
-                }
-                canvas.pushSprite(0, 0); 
+    if (M5Cardputer.Keyboard.isPressed()) {
+        auto status = M5Cardputer.Keyboard.keysState();
+        
+        if (status.enter) { 
+            if (inputText.length() > 0) {
+                askAI(inputText);
+                inputText = ""; 
             }
+        } 
+        else if (status.del) {
+            if (inputText.length() > 0) {
+                inputText.remove(inputText.length() - 1);
+                
+                int x = canvas.getCursorX();
+                int y = canvas.getCursorY();
+                
+                // Cursor managment (font text size 1 wide 6 pixel, hight 8)
+                if (x < 6) { 
+                    x = 240 - 6; // Back to endline
+                    y -= 8;      // Back to upper line
+                } else {
+                    x -= 6;      // Backspace 1 char
+                }
+                
+                // Black rectang to graficaly delete char
+                canvas.fillRect(x, y, 6, 8, TFT_BLACK); 
+                canvas.setCursor(x, y);
+                canvas.pushSprite(0, 0);
+            }
+        } 
+        else {
+            for (auto i : status.word) {
+                inputText += i;
+                canvas.setTextColor(TFT_CYAN);
+                canvas.print(i); 
+            }
+            canvas.pushSprite(0, 0); 
         }
     }
+}
 }
