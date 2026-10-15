@@ -21,7 +21,7 @@ void setup() {
     canvas.setTextSize(1);
     canvas.setTextScroll(true);
     
-    // Istruzioni a schermo per il Captive Portal
+    // Display initial message and instructions for WiFi connection
     canvas.fillSprite(TFT_BLACK);
     canvas.setTextColor(TFT_YELLOW);
     canvas.setCursor(10, 10);
@@ -37,10 +37,10 @@ void setup() {
     
     WiFiManager wm;
     
-    // wm.resetSettings(); // Scommenta e carica il codice una volta se vuoi resettare le reti salvate
+    // wm.resetSettings(); // Decomment this line to reset WiFi settings and force Captive Portal on next boot
     
-    // autoConnect prova a connettersi. Se fallisce, crea la rete "Cardputer_AI" e blocca il codice qui 
-    // finché non inserisci i dati dal telefono.
+    // autoConnect try to connect to the last used WiFi network, if it fails, it will start a Captive Portal
+    // until you insert the correct SSID and Password
     bool res = wm.autoConnect("Cardputer_AI");
     
     if (!res) {
@@ -54,7 +54,7 @@ void setup() {
         esp_restart();
     }
     
-    // Connessione avvenuta con successo (da reti salvate o appena inserite)
+    // Connection successful
     canvas.fillSprite(TFT_BLACK); 
     canvas.setCursor(0, 0);
     canvas.setTextColor(TFT_GREEN);
@@ -67,7 +67,7 @@ void setup() {
     canvas.pushSprite(0, 0);
 }
 
-// Funzione per scrivere senza andare a capo a meno che non sia richiesto
+// Function to write text to the canvas with optional color and new line
 void writeToCanvas(String text, uint16_t color = TFT_WHITE, bool newLine = false) {
     canvas.setTextColor(color);
     if (newLine) canvas.println(text);
